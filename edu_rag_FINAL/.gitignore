@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+*.log
+.env
+.env.*
+
+# Large local assets
+models/
+rag_store/
+uploads/
+knowledge_base/
+
+# keep structure markers if present
+!models/.gitkeep
+!rag_store/.gitkeep
+!uploads/.gitkeep
+!knowledge_base/.gitkeep

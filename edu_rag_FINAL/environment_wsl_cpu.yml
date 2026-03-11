@@ -1,0 +1,11 @@
+name: edu_rag_cpu
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - ffmpeg  # for audio/video parsing
+  - poppler  # optional (PDF utils)
+  - tesseract  # optional OCR backend
+  - pip:
+      - -r requirements.txt
