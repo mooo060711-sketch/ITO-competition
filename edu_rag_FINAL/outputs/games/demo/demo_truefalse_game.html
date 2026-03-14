@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>判断题测试</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --card: #334155;
+    --primary: #38bdf8; --secondary: #818cf8; --accent: #f472b6;
+    --success: #34d399; --danger: #f87171; --warning: #fbbf24;
+    --text: #f1f5f9; --text-dim: #94a3b8;
+    --radius: 12px; --shadow: 0 8px 32px rgba(0,0,0,.35);
+  }
+  body {
+    font-family: 'Noto Sans SC', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; padding: 24px;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(56,189,248,.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(129,140,248,.08) 0%, transparent 50%);
+  }
+  .game-container {
+    max-width: 800px; margin: 0 auto;
+  }
+  .game-header {
+    text-align: center; margin-bottom: 32px;
+    animation: fadeInDown .6s ease-out;
+  }
+  .game-header h1 {
+    font-size: 28px; font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .game-header .subtitle {
+    color: var(--text-dim); font-size: 14px; margin-top: 8px;
+  }
+  .score-bar {
+    display: flex; justify-content: center; gap: 24px;
+    margin: 16px 0; font-size: 15px; color: var(--text-dim);
+  }
+  .score-bar span { font-weight: 500; color: var(--primary); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 10px 24px; border: none; border-radius: 8px;
+    font-size: 15px; font-weight: 500; cursor: pointer;
+    transition: all .2s ease; font-family: inherit;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: #fff; box-shadow: 0 4px 16px rgba(56,189,248,.3);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56,189,248,.4); }
+  .btn-outline {
+    background: transparent; border: 1.5px solid var(--primary);
+    color: var(--primary);
+  }
+  .btn-outline:hover { background: rgba(56,189,248,.1); }
+
+  .card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 24px; margin-bottom: 16px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(255,255,255,.06);
+    animation: fadeInUp .5s ease-out both;
+  }
+
+  .result-overlay {
+    position: fixed; inset: 0; background: rgba(15,23,42,.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; animation: fadeIn .3s;
+  }
+  .result-box {
+    background: var(--surface); border-radius: 20px; padding: 40px;
+    text-align: center; max-width: 420px; box-shadow: var(--shadow);
+    animation: scaleIn .4s ease-out;
+  }
+  .result-box h2 { font-size: 24px; margin-bottom: 12px; }
+  .result-box .score-display {
+    font-size: 56px; font-weight: 700;
+    background: linear-gradient(135deg, var(--success), var(--primary));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin: 16px 0;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes scaleIn { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+</style>
+</head>
+<body>
+<div class="game-container">
+
+<div class="game-header">
+  <h1>⚖️ 判断题测试</h1>
+  <div class="subtitle">判断以下陈述的正误</div>
+</div>
+<div class="score-bar">
+  <div>得分: <span id="score">0</span> / 2</div>
+  <div>进度: <span id="prog">1</span> / 2</div>
+</div>
+<div id="tf-area"></div>
+
+<script>
+const questions = [{"id": 1, "statement": "DNA复制是半保留复制", "answer": true, "explanation": "每条子链各含一条母链和一条新链"}, {"id": 2, "statement": "转录发生在细胞质中", "answer": false, "explanation": "转录主要发生在细胞核中"}];
+let cur = 0, score = 0, answered = new Array(questions.length).fill(null);
+
+function render() {
+  const q = questions[cur];
+  const isAns = answered[cur] !== null;
+  let html = `<div class="card">
+    <div style="color:var(--primary);font-size:13px;margin-bottom:8px;">第 ${cur+1} 题</div>
+    <div style="font-size:17px;font-weight:500;margin-bottom:24px;line-height:1.7">${q.statement}</div>
+    <div style="display:flex;gap:16px;justify-content:center;">`;
+  // True button
+  let tCls = 'tf-btn', fCls = 'tf-btn';
+  if (isAns) {
+    if (q.answer === true) tCls += ' tf-correct'; else tCls += ' tf-dim';
+    if (q.answer === false) fCls += ' tf-correct'; else fCls += ' tf-dim';
+    if (answered[cur] === true && q.answer !== true) tCls += ' tf-wrong';
+    if (answered[cur] === false && q.answer !== false) fCls += ' tf-wrong';
+  }
+  html += `<div class="${tCls}" onclick="answer(true)" ${isAns?'style="pointer-events:none"':''}>
+    <span style="font-size:28px;">✓</span><span>正确</span>
+  </div>`;
+  html += `<div class="${fCls}" onclick="answer(false)" ${isAns?'style="pointer-events:none"':''}>
+    <span style="font-size:28px;">✗</span><span>错误</span>
+  </div></div>`;
+  if (isAns && q.explanation) {
+    const ok = answered[cur] === q.answer;
+    html += `<div class="${ok?'exp-correct':'exp-wrong'}" style="margin-top:20px;padding:14px;border-radius:10px;font-size:14px;line-height:1.6;">
+      <strong>${ok?'✓ 回答正确':'✗ 回答错误'}</strong> — ${q.explanation}</div>`;
+  }
+  html += '</div>';
+  // Nav
+  html += '<div style="display:flex;justify-content:center;gap:12px;margin-top:16px;">';
+  if (cur > 0) html += '<button class="btn btn-outline" onclick="cur--;render();">← 上一题</button>';
+  if (cur < questions.length-1 && isAns) html += '<button class="btn btn-primary" onclick="cur++;render();">下一题 →</button>';
+  else if (cur === questions.length-1 && isAns) html += '<button class="btn btn-primary" onclick="showResult()">查看结果</button>';
+  html += '</div>';
+
+  document.getElementById('tf-area').innerHTML = html;
+  document.getElementById('prog').textContent = cur + 1;
+}
+
+function answer(val) {
+  if (answered[cur] !== null) return;
+  answered[cur] = val;
+  if (val === questions[cur].answer) score++;
+  document.getElementById('score').textContent = score;
+  render();
+}
+
+function showResult() {
+  const pct = Math.round(score / questions.length * 100);
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="result-overlay" onclick="this.remove()">
+      <div class="result-box">
+        <div style="font-size:48px;">${pct >= 80 ? '🏆' : '💪'}</div>
+        <h2>判断题完成!</h2>
+        <div class="score-display">${pct}%</div>
+        <div style="color:var(--text-dim);margin-bottom:20px;">答对 ${score} / ${questions.length} 题</div>
+        <button class="btn btn-primary" onclick="location.reload()">重新开始</button>
+      </div>
+    </div>`);
+}
+
+render();
+</script>
+
+<style>
+.tf-btn {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px; padding: 24px 40px; border-radius: 16px;
+  background: var(--card); border: 2px solid transparent;
+  cursor: pointer; transition: all .2s; font-size: 16px; font-weight: 500;
+}
+.tf-btn:hover { border-color: var(--primary); transform: scale(1.05); }
+.tf-correct { border-color: var(--success) !important; background: rgba(52,211,153,.15) !important; }
+.tf-wrong { border-color: var(--danger) !important; background: rgba(248,113,113,.15) !important; animation: shake .4s; }
+.tf-dim { opacity: .5; }
+</style>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>填空题</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --card: #334155;
+    --primary: #38bdf8; --secondary: #818cf8; --accent: #f472b6;
+    --success: #34d399; --danger: #f87171; --warning: #fbbf24;
+    --text: #f1f5f9; --text-dim: #94a3b8;
+    --radius: 12px; --shadow: 0 8px 32px rgba(0,0,0,.35);
+  }
+  body {
+    font-family: 'Noto Sans SC', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; padding: 24px;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(56,189,248,.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(129,140,248,.08) 0%, transparent 50%);
+  }
+  .game-container {
+    max-width: 800px; margin: 0 auto;
+  }
+  .game-header {
+    text-align: center; margin-bottom: 32px;
+    animation: fadeInDown .6s ease-out;
+  }
+  .game-header h1 {
+    font-size: 28px; font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .game-header .subtitle {
+    color: var(--text-dim); font-size: 14px; margin-top: 8px;
+  }
+  .score-bar {
+    display: flex; justify-content: center; gap: 24px;
+    margin: 16px 0; font-size: 15px; color: var(--text-dim);
+  }
+  .score-bar span { font-weight: 500; color: var(--primary); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 10px 24px; border: none; border-radius: 8px;
+    font-size: 15px; font-weight: 500; cursor: pointer;
+    transition: all .2s ease; font-family: inherit;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: #fff; box-shadow: 0 4px 16px rgba(56,189,248,.3);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56,189,248,.4); }
+  .btn-outline {
+    background: transparent; border: 1.5px solid var(--primary);
+    color: var(--primary);
+  }
+  .btn-outline:hover { background: rgba(56,189,248,.1); }
+
+  .card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 24px; margin-bottom: 16px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(255,255,255,.06);
+    animation: fadeInUp .5s ease-out both;
+  }
+
+  .result-overlay {
+    position: fixed; inset: 0; background: rgba(15,23,42,.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; animation: fadeIn .3s;
+  }
+  .result-box {
+    background: var(--surface); border-radius: 20px; padding: 40px;
+    text-align: center; max-width: 420px; box-shadow: var(--shadow);
+    animation: scaleIn .4s ease-out;
+  }
+  .result-box h2 { font-size: 24px; margin-bottom: 12px; }
+  .result-box .score-display {
+    font-size: 56px; font-weight: 700;
+    background: linear-gradient(135deg, var(--success), var(--primary));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin: 16px 0;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes scaleIn { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+</style>
+</head>
+<body>
+<div class="game-container">
+
+<div class="game-header">
+  <h1>✏️ 填空题</h1>
+  <div class="subtitle">在空白处填入正确答案</div>
+</div>
+<div class="score-bar">
+  <div>得分: <span id="score">0</span> / <span id="total">1</span></div>
+</div>
+<div id="fill-area"></div>
+<div style="text-align:center;margin-top:24px;">
+  <button class="btn btn-primary" onclick="submitAll()">全部提交</button>
+  <button class="btn btn-outline" onclick="location.reload()">重新开始</button>
+</div>
+
+<script>
+const questions = [{"id": 1, "sentence": "中心法则中，____通过转录传递到____。", "blanks": ["DNA", "RNA"], "hint": "两种核酸"}];
+let score = 0, submitted = false;
+
+function render() {
+  const area = document.getElementById('fill-area');
+  let html = '';
+  questions.forEach((q, qi) => {
+    html += `<div class="card" style="animation-delay:${qi*0.08}s">
+      <div style="color:var(--primary);font-size:13px;margin-bottom:8px;">第 ${qi+1} 题</div>`;
+    // Replace ____ with input fields
+    let parts = q.sentence.split('____');
+    let sentence = '';
+    parts.forEach((part, pi) => {
+      sentence += `<span>${part}</span>`;
+      if (pi < parts.length - 1) {
+        sentence += `<input type="text" class="fill-input" id="fill-${qi}-${pi}"
+          placeholder="填写答案" ${submitted?'disabled':''}>`;
+      }
+    });
+    html += `<div class="fill-sentence">${sentence}</div>`;
+    if (q.hint) html += `<div class="fill-hint">💡 提示: ${q.hint}</div>`;
+    html += `<div id="fill-fb-${qi}" class="fill-feedback"></div></div>`;
+  });
+  area.innerHTML = html;
+}
+
+function submitAll() {
+  if (submitted) return;
+  submitted = true;
+  score = 0;
+  questions.forEach((q, qi) => {
+    const fb = document.getElementById('fill-fb-' + qi);
+    let allCorrect = true;
+    q.blanks.forEach((ans, bi) => {
+      const input = document.getElementById(`fill-${qi}-${bi}`);
+      input.disabled = true;
+      const userAns = (input.value || '').trim();
+      // Flexible matching: contains the key answer
+      if (userAns && (userAns === ans || ans.includes(userAns) || userAns.includes(ans))) {
+        input.style.borderColor = 'var(--success)';
+        input.style.background = 'rgba(52,211,153,.1)';
+      } else {
+        input.style.borderColor = 'var(--danger)';
+        input.style.background = 'rgba(248,113,113,.1)';
+        allCorrect = false;
+      }
+    });
+    if (allCorrect) {
+      score++;
+      fb.innerHTML = '<div class="exp-correct" style="margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px;">✓ 正确</div>';
+    } else {
+      fb.innerHTML = `<div class="exp-wrong" style="margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px;">✗ 参考答案: ${q.blanks.join(' / ')}</div>`;
+    }
+  });
+  document.getElementById('score').textContent = score;
+}
+
+render();
+</script>
+
+<style>
+.fill-sentence { font-size: 16px; line-height: 2.2; }
+.fill-input {
+  display: inline-block; width: 140px; padding: 4px 10px;
+  border: 2px solid var(--card); border-radius: 6px;
+  background: var(--card); color: var(--text);
+  font-size: 14px; font-family: inherit;
+  text-align: center; transition: all .2s;
+  margin: 0 4px;
+}
+.fill-input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 12px rgba(56,189,248,.2); }
+.fill-hint { color: var(--text-dim); font-size: 13px; margin-top: 8px; }
+</style>
+
+</div>
+</body>
+</html>

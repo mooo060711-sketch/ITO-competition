@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>流程补全</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --card: #334155;
+    --primary: #38bdf8; --secondary: #818cf8; --accent: #f472b6;
+    --success: #34d399; --danger: #f87171; --warning: #fbbf24;
+    --text: #f1f5f9; --text-dim: #94a3b8;
+    --radius: 12px; --shadow: 0 8px 32px rgba(0,0,0,.35);
+  }
+  body {
+    font-family: 'Noto Sans SC', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; padding: 24px;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(56,189,248,.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(129,140,248,.08) 0%, transparent 50%);
+  }
+  .game-container {
+    max-width: 800px; margin: 0 auto;
+  }
+  .game-header {
+    text-align: center; margin-bottom: 32px;
+    animation: fadeInDown .6s ease-out;
+  }
+  .game-header h1 {
+    font-size: 28px; font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .game-header .subtitle {
+    color: var(--text-dim); font-size: 14px; margin-top: 8px;
+  }
+  .score-bar {
+    display: flex; justify-content: center; gap: 24px;
+    margin: 16px 0; font-size: 15px; color: var(--text-dim);
+  }
+  .score-bar span { font-weight: 500; color: var(--primary); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 10px 24px; border: none; border-radius: 8px;
+    font-size: 15px; font-weight: 500; cursor: pointer;
+    transition: all .2s ease; font-family: inherit;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: #fff; box-shadow: 0 4px 16px rgba(56,189,248,.3);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56,189,248,.4); }
+  .btn-outline {
+    background: transparent; border: 1.5px solid var(--primary);
+    color: var(--primary);
+  }
+  .btn-outline:hover { background: rgba(56,189,248,.1); }
+
+  .card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 24px; margin-bottom: 16px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(255,255,255,.06);
+    animation: fadeInUp .5s ease-out both;
+  }
+
+  .result-overlay {
+    position: fixed; inset: 0; background: rgba(15,23,42,.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; animation: fadeIn .3s;
+  }
+  .result-box {
+    background: var(--surface); border-radius: 20px; padding: 40px;
+    text-align: center; max-width: 420px; box-shadow: var(--shadow);
+    animation: scaleIn .4s ease-out;
+  }
+  .result-box h2 { font-size: 24px; margin-bottom: 12px; }
+  .result-box .score-display {
+    font-size: 56px; font-weight: 700;
+    background: linear-gradient(135deg, var(--success), var(--primary));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin: 16px 0;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes scaleIn { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+</style>
+</head>
+<body>
+<div class="game-container">
+
+<div class="game-header">
+  <h1>🔬 流程补全</h1>
+  <div class="subtitle">补全转录流程 · 从选项中拖入正确内容补全流程</div>
+</div>
+<div id="flow-area"></div>
+
+<script>
+const data = {"nodes": [{"id": 1, "label": "启动子识别", "is_blank": false}, {"id": 2, "label": "DNA解旋", "is_blank": true}, {"id": 3, "label": "RNA合成", "is_blank": false}, {"id": 4, "label": "mRNA释放", "is_blank": true}], "arrows": [{"from": 1, "to": 2, "label": ""}, {"from": 2, "to": 3, "label": ""}, {"from": 3, "to": 4, "label": ""}], "blank_answers": {"2": "DNA解旋", "4": "mRNA释放"}};
+const blanks = data.blank_answers;
+const blankIds = Object.keys(blanks);
+let userAnswers = {};
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+const options = shuffle(Object.values(blanks));
+
+function render() {
+  let html = '<div class="card">';
+  // Options bank
+  html += '<div class="flow-bank"><div style="font-size:13px;color:var(--text-dim);margin-bottom:8px;">📦 选项库 (点击选项，再点击空白节点)</div><div class="flow-opts">';
+  options.forEach((opt, i) => {
+    const used = Object.values(userAnswers).includes(opt);
+    html += `<div class="flow-opt ${used?'flow-opt-used':''}" onclick="selectOpt('${opt.replace(/'/g,"\\'")}')">${opt}</div>`;
+  });
+  html += '</div></div>';
+  // Flow nodes
+  html += '<div class="flow-nodes">';
+  data.nodes.forEach((node, i) => {
+    const isBlank = node.is_blank;
+    const filled = userAnswers[node.id];
+    if (isBlank) {
+      html += `<div class="flow-node flow-blank" onclick="fillBlank(${node.id})">
+        ${filled || '<span style=\"color:var(--text-dim)\">点击填入</span>'}
+      </div>`;
+    } else {
+      html += `<div class="flow-node">${node.label}</div>`;
+    }
+    if (i < data.nodes.length - 1) {
+      const arrow = data.arrows.find(a => a.from === data.nodes[i].id && a.to === data.nodes[i+1].id);
+      html += `<div class="flow-arrow">↓ ${arrow ? '<span style="font-size:11px;color:var(--text-dim)">' + arrow.label + '</span>' : ''}</div>`;
+    }
+  });
+  html += '</div>';
+  html += `<div style="text-align:center;margin-top:20px;">
+    <button class="btn btn-primary" onclick="checkFlow()">检查答案</button>
+    <button class="btn btn-outline" onclick="resetFlow()">重置</button>
+  </div>`;
+  html += '<div id="flow-fb"></div></div>';
+  document.getElementById('flow-area').innerHTML = html;
+}
+
+let selectedOpt = null;
+function selectOpt(opt) { selectedOpt = opt; }
+function fillBlank(nodeId) {
+  if (selectedOpt) {
+    userAnswers[nodeId] = selectedOpt;
+    selectedOpt = null;
+    render();
+  }
+}
+
+function checkFlow() {
+  let correct = 0;
+  blankIds.forEach(id => {
+    if (userAnswers[id] === blanks[id]) correct++;
+  });
+  const fb = document.getElementById('flow-fb');
+  if (correct === blankIds.length) {
+    fb.innerHTML = '<div class="sort-success" style="margin-top:16px;">🎉 完全正确! 流程补全无误!</div>';
+  } else {
+    fb.innerHTML = `<div class="sort-wrong" style="margin-top:16px;">还有 ${blankIds.length - correct} 处错误，再试试!</div>`;
+  }
+}
+
+function resetFlow() { userAnswers = {}; selectedOpt = null; render(); }
+render();
+</script>
+
+<style>
+.flow-bank { margin-bottom: 24px; }
+.flow-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.flow-opt {
+  padding: 8px 16px; border-radius: 8px; font-size: 13px;
+  background: var(--card); border: 1.5px solid rgba(56,189,248,.3);
+  cursor: pointer; transition: all .2s;
+}
+.flow-opt:hover { border-color: var(--primary); background: rgba(56,189,248,.1); }
+.flow-opt-used { opacity: .35; pointer-events: none; text-decoration: line-through; }
+.flow-nodes { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.flow-node {
+  padding: 14px 28px; border-radius: 12px; font-size: 14px;
+  background: var(--card); border: 2px solid rgba(255,255,255,.1);
+  min-width: 220px; text-align: center; transition: all .2s;
+}
+.flow-blank {
+  border-style: dashed; border-color: var(--primary);
+  cursor: pointer; min-height: 48px;
+}
+.flow-blank:hover { background: rgba(56,189,248,.08); }
+.flow-arrow { color: var(--primary); font-size: 18px; display: flex; flex-direction: column; align-items: center; }
+</style>
+
+</div>
+</body>
+</html>

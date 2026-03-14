@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>转录过程排序</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --card: #334155;
+    --primary: #38bdf8; --secondary: #818cf8; --accent: #f472b6;
+    --success: #34d399; --danger: #f87171; --warning: #fbbf24;
+    --text: #f1f5f9; --text-dim: #94a3b8;
+    --radius: 12px; --shadow: 0 8px 32px rgba(0,0,0,.35);
+  }
+  body {
+    font-family: 'Noto Sans SC', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; padding: 24px;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(56,189,248,.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(129,140,248,.08) 0%, transparent 50%);
+  }
+  .game-container {
+    max-width: 800px; margin: 0 auto;
+  }
+  .game-header {
+    text-align: center; margin-bottom: 32px;
+    animation: fadeInDown .6s ease-out;
+  }
+  .game-header h1 {
+    font-size: 28px; font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .game-header .subtitle {
+    color: var(--text-dim); font-size: 14px; margin-top: 8px;
+  }
+  .score-bar {
+    display: flex; justify-content: center; gap: 24px;
+    margin: 16px 0; font-size: 15px; color: var(--text-dim);
+  }
+  .score-bar span { font-weight: 500; color: var(--primary); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 10px 24px; border: none; border-radius: 8px;
+    font-size: 15px; font-weight: 500; cursor: pointer;
+    transition: all .2s ease; font-family: inherit;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: #fff; box-shadow: 0 4px 16px rgba(56,189,248,.3);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56,189,248,.4); }
+  .btn-outline {
+    background: transparent; border: 1.5px solid var(--primary);
+    color: var(--primary);
+  }
+  .btn-outline:hover { background: rgba(56,189,248,.1); }
+
+  .card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 24px; margin-bottom: 16px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(255,255,255,.06);
+    animation: fadeInUp .5s ease-out both;
+  }
+
+  .result-overlay {
+    position: fixed; inset: 0; background: rgba(15,23,42,.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; animation: fadeIn .3s;
+  }
+  .result-box {
+    background: var(--surface); border-radius: 20px; padding: 40px;
+    text-align: center; max-width: 420px; box-shadow: var(--shadow);
+    animation: scaleIn .4s ease-out;
+  }
+  .result-box h2 { font-size: 24px; margin-bottom: 12px; }
+  .result-box .score-display {
+    font-size: 56px; font-weight: 700;
+    background: linear-gradient(135deg, var(--success), var(--primary));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin: 16px 0;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes scaleIn { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+</style>
+</head>
+<body>
+<div class="game-container">
+
+<div class="game-header">
+  <h1>📋 转录过程排序</h1>
+  <div class="subtitle">拖拽或点击箭头将步骤排列为正确顺序</div>
+</div>
+<div id="sort-area"></div>
+
+<script>
+const tasks = [{"id": 1, "description": "按正确顺序排列", "correct_order": ["RNA聚合酶结合启动子", "DNA解旋", "RNA链延伸", "到达终止子", "mRNA释放"]}];
+let currentTask = 0;
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+let items = [];
+let dragIdx = null;
+
+function renderTask() {
+  const task = tasks[currentTask];
+  items = shuffle(task.correct_order);
+  renderItems(task);
+}
+
+function renderItems(task) {
+  const area = document.getElementById('sort-area');
+  let html = `<div class="card">
+    <div style="font-size:15px;margin-bottom:20px;color:var(--text-dim);">${task.description}</div>
+    <div id="sort-list">`;
+  items.forEach((item, i) => {
+    html += `<div class="sort-item" draggable="true"
+      ondragstart="onDragStart(event,${i})"
+      ondragover="event.preventDefault()"
+      ondrop="onDrop(event,${i})">
+      <span class="sort-num">${i+1}</span>
+      <span class="sort-text">${item}</span>
+      <span class="sort-arrows">
+        <button class="arrow-btn" onclick="moveUp(${i})">▲</button>
+        <button class="arrow-btn" onclick="moveDown(${i})">▼</button>
+      </span>
+    </div>`;
+  });
+  html += `</div>
+    <div style="display:flex;gap:12px;justify-content:center;margin-top:20px;">
+      <button class="btn btn-primary" onclick="checkOrder()">提交答案</button>
+      <button class="btn btn-outline" onclick="renderTask()">重新打乱</button>
+    </div>
+    <div id="sort-feedback"></div>
+  </div>`;
+  area.innerHTML = html;
+}
+
+function onDragStart(e, i) { dragIdx = i; e.dataTransfer.effectAllowed = 'move'; }
+function onDrop(e, i) {
+  e.preventDefault();
+  if (dragIdx === null || dragIdx === i) return;
+  const item = items.splice(dragIdx, 1)[0];
+  items.splice(i, 0, item);
+  dragIdx = null;
+  renderItems(tasks[currentTask]);
+}
+function moveUp(i) { if (i > 0) { [items[i-1], items[i]] = [items[i], items[i-1]]; renderItems(tasks[currentTask]); } }
+function moveDown(i) { if (i < items.length-1) { [items[i], items[i+1]] = [items[i+1], items[i]]; renderItems(tasks[currentTask]); } }
+
+function checkOrder() {
+  const correct = tasks[currentTask].correct_order;
+  const isCorrect = items.every((item, i) => item === correct[i]);
+  const fb = document.getElementById('sort-feedback');
+  if (isCorrect) {
+    fb.innerHTML = '<div class="sort-success">🎉 完全正确! 排列顺序无误!</div>';
+    if (currentTask < tasks.length - 1) {
+      fb.innerHTML += `<button class="btn btn-primary" style="margin-top:12px;" onclick="nextTask()">下一题 →</button>`;
+    }
+  } else {
+    let wrongCount = items.filter((item, i) => item !== correct[i]).length;
+    fb.innerHTML = `<div class="sort-wrong">❌ 还有 ${wrongCount} 个位置不正确，再试试!</div>`;
+    // highlight wrong items
+    document.querySelectorAll('.sort-item').forEach((el, i) => {
+      if (items[i] !== correct[i]) el.style.borderColor = 'var(--danger)';
+      else el.style.borderColor = 'var(--success)';
+    });
+  }
+}
+
+function nextTask() { currentTask++; renderTask(); }
+renderTask();
+</script>
+
+<style>
+.sort-item {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px; margin-bottom: 8px; border-radius: 10px;
+  background: var(--card); border: 2px solid transparent;
+  cursor: grab; transition: all .2s; user-select: none;
+}
+.sort-item:hover { border-color: var(--primary); }
+.sort-item:active { cursor: grabbing; }
+.sort-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(56,189,248,.2); color: var(--primary);
+  font-weight: 700; font-size: 13px; flex-shrink: 0;
+}
+.sort-text { flex: 1; font-size: 14px; }
+.sort-arrows { display: flex; flex-direction: column; gap: 2px; }
+.arrow-btn {
+  background: none; border: none; color: var(--text-dim);
+  cursor: pointer; font-size: 10px; padding: 2px 6px; border-radius: 4px;
+}
+.arrow-btn:hover { background: rgba(255,255,255,.1); color: var(--text); }
+.sort-success {
+  margin-top: 16px; padding: 14px 18px; border-radius: 10px;
+  background: rgba(52,211,153,.12); border-left: 3px solid var(--success);
+  font-size: 15px; animation: fadeIn .3s;
+}
+.sort-wrong {
+  margin-top: 16px; padding: 14px 18px; border-radius: 10px;
+  background: rgba(248,113,113,.12); border-left: 3px solid var(--danger);
+  font-size: 15px; animation: shake .4s;
+}
+</style>
+
+</div>
+</body>
+</html>

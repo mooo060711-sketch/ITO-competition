@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>概念配对</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --card: #334155;
+    --primary: #38bdf8; --secondary: #818cf8; --accent: #f472b6;
+    --success: #34d399; --danger: #f87171; --warning: #fbbf24;
+    --text: #f1f5f9; --text-dim: #94a3b8;
+    --radius: 12px; --shadow: 0 8px 32px rgba(0,0,0,.35);
+  }
+  body {
+    font-family: 'Noto Sans SC', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; padding: 24px;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(56,189,248,.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(129,140,248,.08) 0%, transparent 50%);
+  }
+  .game-container {
+    max-width: 800px; margin: 0 auto;
+  }
+  .game-header {
+    text-align: center; margin-bottom: 32px;
+    animation: fadeInDown .6s ease-out;
+  }
+  .game-header h1 {
+    font-size: 28px; font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .game-header .subtitle {
+    color: var(--text-dim); font-size: 14px; margin-top: 8px;
+  }
+  .score-bar {
+    display: flex; justify-content: center; gap: 24px;
+    margin: 16px 0; font-size: 15px; color: var(--text-dim);
+  }
+  .score-bar span { font-weight: 500; color: var(--primary); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 10px 24px; border: none; border-radius: 8px;
+    font-size: 15px; font-weight: 500; cursor: pointer;
+    transition: all .2s ease; font-family: inherit;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: #fff; box-shadow: 0 4px 16px rgba(56,189,248,.3);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56,189,248,.4); }
+  .btn-outline {
+    background: transparent; border: 1.5px solid var(--primary);
+    color: var(--primary);
+  }
+  .btn-outline:hover { background: rgba(56,189,248,.1); }
+
+  .card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 24px; margin-bottom: 16px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(255,255,255,.06);
+    animation: fadeInUp .5s ease-out both;
+  }
+
+  .result-overlay {
+    position: fixed; inset: 0; background: rgba(15,23,42,.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; animation: fadeIn .3s;
+  }
+  .result-box {
+    background: var(--surface); border-radius: 20px; padding: 40px;
+    text-align: center; max-width: 420px; box-shadow: var(--shadow);
+    animation: scaleIn .4s ease-out;
+  }
+  .result-box h2 { font-size: 24px; margin-bottom: 12px; }
+  .result-box .score-display {
+    font-size: 56px; font-weight: 700;
+    background: linear-gradient(135deg, var(--success), var(--primary));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin: 16px 0;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes scaleIn { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+</style>
+</head>
+<body>
+<div class="game-container">
+
+<div class="game-header">
+  <h1>🔗 概念配对</h1>
+  <div class="subtitle">将左侧概念与右侧定义正确配对 · 点击选中后点击配对项</div>
+</div>
+<div class="score-bar">
+  <div>已配对: <span id="matched">0</span> / <span>3</span></div>
+</div>
+<div id="match-area" style="display:flex;gap:24px;justify-content:center;flex-wrap:wrap;"></div>
+<div style="text-align:center;margin-top:24px;">
+  <button class="btn btn-outline" onclick="resetGame()">重新开始</button>
+</div>
+
+<script>
+const pairs = [{"left": "mRNA", "right": "携带遗传信息到核糖体"}, {"left": "tRNA", "right": "运送氨基酸到核糖体"}, {"left": "rRNA", "right": "构成核糖体的组分"}];
+let selectedLeft = null, selectedRight = null, matchedCount = 0;
+const leftItems = pairs.map((p,i) => ({id: i, text: p.left, matched: false}));
+const rightItems = [...pairs.map((p,i) => ({id: i, text: p.right, matched: false}))];
+// shuffle right
+for (let i = rightItems.length - 1; i > 0; i--) {
+  const j = Math.floor(Math.random() * (i + 1));
+  [rightItems[i], rightItems[j]] = [rightItems[j], rightItems[i]];
+}
+
+function render() {
+  const area = document.getElementById('match-area');
+  let lhtml = '<div class="match-col">';
+  leftItems.forEach(it => {
+    const cls = it.matched ? 'match-item matched' : (selectedLeft === it.id ? 'match-item selected-left' : 'match-item');
+    lhtml += `<div class="${cls}" data-side="left" data-id="${it.id}" onclick="selectItem('left',${it.id})">${it.text}</div>`;
+  });
+  lhtml += '</div>';
+
+  let rhtml = '<div class="match-col">';
+  rightItems.forEach(it => {
+    const cls = it.matched ? 'match-item matched' : (selectedRight === it.id ? 'match-item selected-right' : 'match-item');
+    rhtml += `<div class="${cls}" data-side="right" data-id="${it.id}" onclick="selectItem('right',${it.id})">${it.text}</div>`;
+  });
+  rhtml += '</div>';
+
+  area.innerHTML = lhtml + '<div class="match-divider"></div>' + rhtml;
+  document.getElementById('matched').textContent = matchedCount;
+}
+
+function selectItem(side, id) {
+  if (side === 'left') {
+    if (leftItems[id].matched) return;
+    selectedLeft = (selectedLeft === id) ? null : id;
+  } else {
+    if (rightItems.find(r => r.id === id).matched) return;
+    selectedRight = (selectedRight === id) ? null : id;
+  }
+  if (selectedLeft !== null && selectedRight !== null) {
+    checkMatch();
+  } else {
+    render();
+  }
+}
+
+function checkMatch() {
+  const rItem = rightItems.find(r => r.id === selectedRight);
+  if (selectedLeft === rItem.id) {
+    leftItems[selectedLeft].matched = true;
+    rItem.matched = true;
+    matchedCount++;
+    if (matchedCount === pairs.length) setTimeout(showComplete, 500);
+  }
+  selectedLeft = null;
+  selectedRight = null;
+  render();
+}
+
+function showComplete() {
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="result-overlay" onclick="this.remove()">
+      <div class="result-box">
+        <div style="font-size:48px;">🎉</div>
+        <h2>全部配对完成!</h2>
+        <div style="color:var(--text-dim);margin:16px 0;">你成功匹配了所有 ${pairs.length} 组概念</div>
+        <button class="btn btn-primary" onclick="location.reload()">再玩一次</button>
+      </div>
+    </div>`);
+}
+
+function resetGame() {
+  matchedCount = 0; selectedLeft = null; selectedRight = null;
+  leftItems.forEach(it => it.matched = false);
+  rightItems.forEach(it => it.matched = false);
+  for (let i = rightItems.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [rightItems[i], rightItems[j]] = [rightItems[j], rightItems[i]];
+  }
+  render();
+}
+
+render();
+</script>
+
+<style>
+.match-col { display: flex; flex-direction: column; gap: 12px; flex: 1; max-width: 340px; }
+.match-divider { width: 2px; background: linear-gradient(to bottom, transparent, var(--primary), transparent); flex-shrink: 0; }
+.match-item {
+  padding: 16px 20px; border-radius: 10px; cursor: pointer;
+  background: var(--surface); border: 2px solid rgba(255,255,255,.08);
+  font-size: 14px; line-height: 1.5; transition: all .2s;
+}
+.match-item:hover { border-color: var(--primary); transform: scale(1.02); }
+.selected-left { border-color: var(--primary) !important; background: rgba(56,189,248,.12) !important; box-shadow: 0 0 20px rgba(56,189,248,.2); }
+.selected-right { border-color: var(--secondary) !important; background: rgba(129,140,248,.12) !important; box-shadow: 0 0 20px rgba(129,140,248,.2); }
+.matched {
+  border-color: var(--success) !important; background: rgba(52,211,153,.1) !important;
+  opacity: .7; pointer-events: none;
+}
+</style>
+
+</div>
+</body>
+</html>
