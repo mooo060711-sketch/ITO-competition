@@ -23,9 +23,9 @@ chunking:
 embedding_model:
   type: bge-m3
   name_or_path: ./models/bge-m3
-  device: cpu
-  batch_size: 32
-  use_fp16: false
+  device: cuda          # cpu改cuda
+  batch_size: 64        # 32改64
+  use_fp16: true        # false改true
 
 # ---------------- Vector Store (Milvus Standalone) ----------------
 vector_store:
@@ -135,12 +135,16 @@ parsing:
 
   audio:
     prefer: faster-whisper
-    model_size: small
+    model_size: medium
+    device: cuda             # 新增这行
+    compute_type: float16    # 新增这行
     segment_level: true
 
   video:
     prefer: faster-whisper
-    model_size: small
+    model_size: medium
+    device: cuda             # 新增这行
+    compute_type: float16    # 新增这行
     segment_level: true
     extract_frames: true
     frame_interval_sec: 5
