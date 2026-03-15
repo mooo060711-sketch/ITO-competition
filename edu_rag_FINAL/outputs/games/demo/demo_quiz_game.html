@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>中心法则基础测验</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --card: #334155;
+    --primary: #38bdf8; --secondary: #818cf8; --accent: #f472b6;
+    --success: #34d399; --danger: #f87171; --warning: #fbbf24;
+    --text: #f1f5f9; --text-dim: #94a3b8;
+    --radius: 12px; --shadow: 0 8px 32px rgba(0,0,0,.35);
+  }
+  body {
+    font-family: 'Noto Sans SC', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; padding: 24px;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(56,189,248,.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(129,140,248,.08) 0%, transparent 50%);
+  }
+  .game-container {
+    max-width: 800px; margin: 0 auto;
+  }
+  .game-header {
+    text-align: center; margin-bottom: 32px;
+    animation: fadeInDown .6s ease-out;
+  }
+  .game-header h1 {
+    font-size: 28px; font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .game-header .subtitle {
+    color: var(--text-dim); font-size: 14px; margin-top: 8px;
+  }
+  .score-bar {
+    display: flex; justify-content: center; gap: 24px;
+    margin: 16px 0; font-size: 15px; color: var(--text-dim);
+  }
+  .score-bar span { font-weight: 500; color: var(--primary); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 10px 24px; border: none; border-radius: 8px;
+    font-size: 15px; font-weight: 500; cursor: pointer;
+    transition: all .2s ease; font-family: inherit;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: #fff; box-shadow: 0 4px 16px rgba(56,189,248,.3);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56,189,248,.4); }
+  .btn-outline {
+    background: transparent; border: 1.5px solid var(--primary);
+    color: var(--primary);
+  }
+  .btn-outline:hover { background: rgba(56,189,248,.1); }
+
+  .card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 24px; margin-bottom: 16px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(255,255,255,.06);
+    animation: fadeInUp .5s ease-out both;
+  }
+
+  .result-overlay {
+    position: fixed; inset: 0; background: rgba(15,23,42,.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; animation: fadeIn .3s;
+  }
+  .result-box {
+    background: var(--surface); border-radius: 20px; padding: 40px;
+    text-align: center; max-width: 420px; box-shadow: var(--shadow);
+    animation: scaleIn .4s ease-out;
+  }
+  .result-box h2 { font-size: 24px; margin-bottom: 12px; }
+  .result-box .score-display {
+    font-size: 56px; font-weight: 700;
+    background: linear-gradient(135deg, var(--success), var(--primary));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin: 16px 0;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes scaleIn { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+</style>
+</head>
+<body>
+<div class="game-container">
+
+<div class="game-header">
+  <h1>📝 中心法则基础测验</h1>
+  <div class="subtitle">共 2 题 · 选择正确答案</div>
+</div>
+<div class="score-bar">
+  <div>得分: <span id="score">0</span> / <span id="total">2</span></div>
+  <div>进度: <span id="progress">1</span> / 2</div>
+</div>
+<div id="quiz-area"></div>
+<div id="nav-bar" style="display:flex;justify-content:center;gap:12px;margin-top:24px;"></div>
+
+<script>
+const questions = [{"id": 1, "stem": "DNA到RNA的过程称为？", "options": ["A. 转录", "B. 翻译", "C. 复制", "D. 逆转录"], "answer": "A", "explanation": "转录是以DNA为模板合成RNA。"}, {"id": 2, "stem": "mRNA到蛋白质的过程称为？", "options": ["A. 转录", "B. 翻译", "C. 复制", "D. 逆转录"], "answer": "B", "explanation": "翻译是以mRNA为模板合成蛋白质。"}];
+let current = 0, score = 0, answered = new Array(questions.length).fill(null);
+
+function renderQ() {
+  const q = questions[current];
+  const area = document.getElementById('quiz-area');
+  const isAns = answered[current] !== null;
+  let html = `<div class="card" style="animation-delay:${current*0.05}s">
+    <div style="color:var(--primary);font-size:13px;margin-bottom:8px;">第 ${current+1} 题</div>
+    <div style="font-size:17px;font-weight:500;margin-bottom:20px;line-height:1.7">${q.stem}</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">`;
+  q.options.forEach((opt, i) => {
+    const letter = opt.charAt(0);
+    let cls = 'opt-btn';
+    if (isAns) {
+      if (letter === q.answer) cls += ' correct';
+      else if (letter === answered[current]) cls += ' wrong';
+    }
+    const disabled = isAns ? 'pointer-events:none;' : '';
+    html += `<div class="opt-btn-wrap ${cls}" style="${disabled}" onclick="choose('${letter}')">
+      <div class="opt-letter">${letter}</div>
+      <div class="opt-text">${opt.substring(2).trim()}</div>
+    </div>`;
+  });
+  html += '</div>';
+  if (isAns && q.explanation) {
+    const isCorrect = answered[current] === q.answer;
+    html += `<div class="explanation ${isCorrect?'exp-correct':'exp-wrong'}">
+      <strong>${isCorrect?'✓ 正确':'✗ 错误'}</strong> — ${q.explanation}
+    </div>`;
+  }
+  html += '</div>';
+  area.innerHTML = html;
+  document.getElementById('progress').textContent = current + 1;
+
+  const nav = document.getElementById('nav-bar');
+  nav.innerHTML = '';
+  if (current > 0) nav.innerHTML += '<button class="btn btn-outline" onclick="prev()">← 上一题</button>';
+  if (current < questions.length - 1) nav.innerHTML += '<button class="btn btn-primary" onclick="next()">下一题 →</button>';
+  else if (isAns) nav.innerHTML += '<button class="btn btn-primary" onclick="showResult()">查看结果</button>';
+}
+
+function choose(letter) {
+  if (answered[current] !== null) return;
+  answered[current] = letter;
+  if (letter === questions[current].answer) score++;
+  document.getElementById('score').textContent = score;
+  renderQ();
+}
+
+function next() { if (current < questions.length - 1) { current++; renderQ(); } }
+function prev() { if (current > 0) { current--; renderQ(); } }
+
+function showResult() {
+  const pct = Math.round(score / questions.length * 100);
+  let emoji = pct >= 90 ? '🏆' : pct >= 70 ? '🌟' : pct >= 50 ? '💪' : '📚';
+  document.body.insertAdjacentHTML('beforeend', `
+    <div class="result-overlay" onclick="this.remove()">
+      <div class="result-box">
+        <div style="font-size:48px;">${emoji}</div>
+        <h2>测验完成!</h2>
+        <div class="score-display">${pct}%</div>
+        <div style="color:var(--text-dim);margin-bottom:20px;">答对 ${score} / ${questions.length} 题</div>
+        <button class="btn btn-primary" onclick="location.reload()">重新开始</button>
+      </div>
+    </div>`);
+}
+
+renderQ();
+</script>
+
+<style>
+.opt-btn-wrap {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 18px; border-radius: 10px; cursor: pointer;
+  background: var(--card); border: 2px solid transparent;
+  transition: all .2s;
+}
+.opt-btn-wrap:hover { border-color: var(--primary); transform: translateX(4px); }
+.opt-letter {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(56,189,248,.15); color: var(--primary);
+  font-weight: 700; font-size: 14px; flex-shrink: 0;
+}
+.opt-text { font-size: 15px; line-height: 1.5; }
+.correct { border-color: var(--success) !important; background: rgba(52,211,153,.1) !important; }
+.correct .opt-letter { background: var(--success); color: #fff; }
+.wrong { border-color: var(--danger) !important; background: rgba(248,113,113,.1) !important; animation: shake .4s; }
+.wrong .opt-letter { background: var(--danger); color: #fff; }
+.explanation {
+  margin-top: 16px; padding: 14px 18px; border-radius: 10px;
+  font-size: 14px; line-height: 1.6; animation: fadeIn .3s;
+}
+.exp-correct { background: rgba(52,211,153,.12); border-left: 3px solid var(--success); }
+.exp-wrong { background: rgba(248,113,113,.12); border-left: 3px solid var(--danger); }
+</style>
+
+</div>
+</body>
+</html>

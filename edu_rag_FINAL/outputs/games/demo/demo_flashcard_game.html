@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>核心术语</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f172a; --surface: #1e293b; --card: #334155;
+    --primary: #38bdf8; --secondary: #818cf8; --accent: #f472b6;
+    --success: #34d399; --danger: #f87171; --warning: #fbbf24;
+    --text: #f1f5f9; --text-dim: #94a3b8;
+    --radius: 12px; --shadow: 0 8px 32px rgba(0,0,0,.35);
+  }
+  body {
+    font-family: 'Noto Sans SC', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; padding: 24px;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(56,189,248,.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 20%, rgba(129,140,248,.08) 0%, transparent 50%);
+  }
+  .game-container {
+    max-width: 800px; margin: 0 auto;
+  }
+  .game-header {
+    text-align: center; margin-bottom: 32px;
+    animation: fadeInDown .6s ease-out;
+  }
+  .game-header h1 {
+    font-size: 28px; font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .game-header .subtitle {
+    color: var(--text-dim); font-size: 14px; margin-top: 8px;
+  }
+  .score-bar {
+    display: flex; justify-content: center; gap: 24px;
+    margin: 16px 0; font-size: 15px; color: var(--text-dim);
+  }
+  .score-bar span { font-weight: 500; color: var(--primary); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 10px 24px; border: none; border-radius: 8px;
+    font-size: 15px; font-weight: 500; cursor: pointer;
+    transition: all .2s ease; font-family: inherit;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    color: #fff; box-shadow: 0 4px 16px rgba(56,189,248,.3);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(56,189,248,.4); }
+  .btn-outline {
+    background: transparent; border: 1.5px solid var(--primary);
+    color: var(--primary);
+  }
+  .btn-outline:hover { background: rgba(56,189,248,.1); }
+
+  .card {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 24px; margin-bottom: 16px;
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(255,255,255,.06);
+    animation: fadeInUp .5s ease-out both;
+  }
+
+  .result-overlay {
+    position: fixed; inset: 0; background: rgba(15,23,42,.85);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000; animation: fadeIn .3s;
+  }
+  .result-box {
+    background: var(--surface); border-radius: 20px; padding: 40px;
+    text-align: center; max-width: 420px; box-shadow: var(--shadow);
+    animation: scaleIn .4s ease-out;
+  }
+  .result-box h2 { font-size: 24px; margin-bottom: 12px; }
+  .result-box .score-display {
+    font-size: 56px; font-weight: 700;
+    background: linear-gradient(135deg, var(--success), var(--primary));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin: 16px 0;
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes scaleIn { from { opacity: 0; transform: scale(.8); } to { opacity: 1; transform: scale(1); } }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+</style>
+</head>
+<body>
+<div class="game-container">
+
+<div class="game-header">
+  <h1>🃏 核心术语</h1>
+  <div class="subtitle">点击卡片翻转，记忆概念与定义</div>
+</div>
+<div class="score-bar">
+  <div>卡片: <span id="cur">1</span> / 3</div>
+  <div>已掌握: <span id="mastered">0</span></div>
+</div>
+<div id="fc-area" style="display:flex;justify-content:center;"></div>
+<div style="display:flex;justify-content:center;gap:12px;margin-top:24px;">
+  <button class="btn btn-outline" onclick="prevCard()">← 上一张</button>
+  <button class="btn btn-outline" style="border-color:var(--danger);color:var(--danger);" onclick="markCard(false)">还不熟</button>
+  <button class="btn btn-outline" style="border-color:var(--success);color:var(--success);" onclick="markCard(true)">已掌握</button>
+  <button class="btn btn-primary" onclick="nextCard()">下一张 →</button>
+</div>
+
+<script>
+const cards = [{"front": "转录", "back": "DNA→RNA的过程"}, {"front": "翻译", "back": "mRNA→蛋白质的过程"}, {"front": "密码子", "back": "mRNA上3个连续碱基"}];
+let cur = 0, flipped = false, mastered = new Set();
+
+function render() {
+  const c = cards[cur];
+  const fc = document.getElementById('fc-area');
+  const flipCls = flipped ? 'flipped' : '';
+  fc.innerHTML = `<div class="flashcard ${flipCls}" onclick="flipCard()">
+    <div class="fc-inner">
+      <div class="fc-front">
+        <div class="fc-label">概念</div>
+        <div class="fc-content">${c.front}</div>
+        <div class="fc-tip">点击翻转 →</div>
+      </div>
+      <div class="fc-back">
+        <div class="fc-label">释义</div>
+        <div class="fc-content">${c.back}</div>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('cur').textContent = cur + 1;
+  document.getElementById('mastered').textContent = mastered.size;
+}
+
+function flipCard() { flipped = !flipped; render(); }
+function nextCard() { if (cur < cards.length - 1) { cur++; flipped = false; render(); } }
+function prevCard() { if (cur > 0) { cur--; flipped = false; render(); } }
+function markCard(ok) {
+  if (ok) mastered.add(cur); else mastered.delete(cur);
+  document.getElementById('mastered').textContent = mastered.size;
+  if (mastered.size === cards.length) {
+    document.body.insertAdjacentHTML('beforeend', `
+      <div class="result-overlay" onclick="this.remove()">
+        <div class="result-box">
+          <div style="font-size:48px;">🧠</div>
+          <h2>全部掌握!</h2>
+          <div style="color:var(--text-dim);margin:16px 0;">你已掌握所有 ${cards.length} 张卡片</div>
+          <button class="btn btn-primary" onclick="location.reload()">再复习一次</button>
+        </div>
+      </div>`);
+  }
+  nextCard();
+}
+
+render();
+</script>
+
+<style>
+.flashcard {
+  width: 420px; height: 280px; perspective: 800px; cursor: pointer;
+}
+.fc-inner {
+  position: relative; width: 100%; height: 100%;
+  transition: transform .6s; transform-style: preserve-3d;
+}
+.flashcard.flipped .fc-inner { transform: rotateY(180deg); }
+.fc-front, .fc-back {
+  position: absolute; inset: 0; backface-visibility: hidden;
+  border-radius: 16px; padding: 32px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center;
+}
+.fc-front {
+  background: linear-gradient(135deg, var(--surface), var(--card));
+  border: 2px solid rgba(56,189,248,.3);
+}
+.fc-back {
+  background: linear-gradient(135deg, rgba(56,189,248,.15), rgba(129,140,248,.15));
+  border: 2px solid rgba(129,140,248,.3);
+  transform: rotateY(180deg);
+}
+.fc-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
+.fc-content { font-size: 18px; font-weight: 500; line-height: 1.6; }
+.fc-tip { font-size: 12px; color: var(--text-dim); margin-top: 16px; }
+</style>
+
+</div>
+</body>
+</html>
