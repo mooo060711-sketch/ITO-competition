@@ -33,7 +33,10 @@ venv\Scripts\activate
 source venv/bin/activate
 
 # 安装依赖（约5-10分钟）
-pip install torch --index-url https://download.pytorch.org/whl/cpu
+# 先装GPU版torch
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# 再装其他依赖（torch已经装了就会跳过）
 pip install -r requirements.txt
 pip install pdf2image
 ```
