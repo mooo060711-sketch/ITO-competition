@@ -16,7 +16,7 @@ pymilvus>=2.4.6
 
 # LLM
 transformers>=4.41.0
-torch>=2.1.0
+torch>=2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 openai>=1.30.0
 
 # Parsing (multimodal)
