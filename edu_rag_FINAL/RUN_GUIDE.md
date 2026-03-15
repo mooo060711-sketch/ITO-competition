@@ -1,4 +1,4 @@
-# 🚀 从零开始运行指南（VSCode）
+# 🚀 运行指南（VSCode）
 
 ## 前置条件
 
@@ -9,10 +9,9 @@
 
 ---
 
-## 第一步：解压 & 用VSCode打开
+## 第一步：用VSCode打开
 
 ```bash
-unzip edu_rag_FINAL_merged.zip
 cd edu_rag_FINAL
 code .
 ```
