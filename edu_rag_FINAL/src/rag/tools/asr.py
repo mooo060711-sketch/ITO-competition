@@ -21,17 +21,21 @@ class ASRResult:
     engine: str
 
 
-def _try_faster_whisper(audio_path: str, model_size: str = "small") -> Optional[ASRResult]:
+def _try_faster_whisper(audio_path: str, model_size: str = "medium",
+                        device: str = "cuda", compute_type: str = "float16") -> Optional[ASRResult]:
     try:
         from faster_whisper import WhisperModel  # type: ignore
     except Exception:
         return None
 
     # cache
-    key = f"_model_{model_size}"
+    key = f"_model_{model_size}_{device}"
     if not hasattr(_try_faster_whisper, key):
-        # device/cuda handled by ctranslate2 automatically; leave default.
-        setattr(_try_faster_whisper, key, WhisperModel(model_size))
+        try:
+            setattr(_try_faster_whisper, key, WhisperModel(model_size, device=device, compute_type=compute_type))
+        except Exception:
+            # GPU不可用时退化到CPU
+            setattr(_try_faster_whisper, key, WhisperModel(model_size, device="cpu", compute_type="int8"))
 
     model: WhisperModel = getattr(_try_faster_whisper, key)
     segments_iter, _info = model.transcribe(audio_path)
@@ -67,7 +71,8 @@ def _try_openai_whisper(audio_path: str, model_size: str = "small") -> Optional[
     return ASRResult(text=text, segments=segs, engine=f"openai-whisper:{model_size}")
 
 
-def transcribe_audio(audio_path: str, prefer: str = "faster-whisper", model_size: str = "small") -> ASRResult:
+def transcribe_audio(audio_path: str, prefer: str = "faster-whisper", model_size: str = "medium",
+                     device: str = "cuda", compute_type: str = "float16") -> ASRResult:
     """Transcribe audio using Faster-Whisper or OpenAI Whisper.
 
     prefer:
@@ -78,7 +83,7 @@ def transcribe_audio(audio_path: str, prefer: str = "faster-whisper", model_size
     """
 
     if prefer == "faster-whisper":
-        r = _try_faster_whisper(audio_path, model_size=model_size)
+        r = _try_faster_whisper(audio_path, model_size=model_size, device=device, compute_type=compute_type)
         if r is not None:
             return r
         r = _try_openai_whisper(audio_path, model_size=model_size)
@@ -88,7 +93,7 @@ def transcribe_audio(audio_path: str, prefer: str = "faster-whisper", model_size
         r = _try_openai_whisper(audio_path, model_size=model_size)
         if r is not None:
             return r
-        r = _try_faster_whisper(audio_path, model_size=model_size)
+        r = _try_faster_whisper(audio_path, model_size=model_size, device=device, compute_type=compute_type)
         if r is not None:
             return r
 
