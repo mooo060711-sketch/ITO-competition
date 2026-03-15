@@ -33,8 +33,9 @@ venv\Scripts\activate
 source venv/bin/activate
 
 # 安装依赖（约5-10分钟）
-# 先装GPU版torch
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+pip install torch>=2.6.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+#如果冲突（强制升级）
+pip install --force-reinstall torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
 # 再装其他依赖（torch已经装了就会跳过）
 pip install -r requirements.txt
