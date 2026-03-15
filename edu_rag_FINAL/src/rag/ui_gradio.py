@@ -1,5 +1,5 @@
 """
-多模态 AI 互动式教学智能体 — 最终版 UI
+多模态 AI 互动式教学智能体 — 最终版 UI（工业级视觉）
 """
 from __future__ import annotations
 import json, traceback
@@ -7,6 +7,55 @@ from pathlib import Path
 from typing import List, Optional
 import gradio as gr
 from .service import RAGService
+
+# ═══════════════════════════════════════════
+# 工业级自定义CSS（Gemini风格 + 功能保留）
+# ═══════════════════════════════════════════
+CUSTOM_CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap');
+.gradio-container {
+    font-family: 'Nunito', 'PingFang SC', sans-serif!important;
+    background: linear-gradient(135deg, #eef2f3 0%, #cbd5e1 100%)!important;
+}
+.glass-panel {
+    background: rgba(255, 255, 255, 0.6)!important;
+    backdrop-filter: blur(16px)!important;
+    border: 1px solid rgba(255, 255, 255, 0.8)!important;
+    border-radius: 24px!important;
+    box-shadow: 0 10px 40px -10px rgba(30, 41, 59, 0.1)!important;
+    padding: 20px!important;
+}
+button.primary {
+    background-color: #58cc02!important; color: white!important;
+    font-weight: 800!important; font-size: 1.1rem!important;
+    border-radius: 16px!important; border: none!important;
+    box-shadow: 0 4px 0 #58a700!important;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1)!important;
+    text-transform: uppercase; letter-spacing: 1px;
+}
+button.primary:hover { background-color: #61df02!important; transform: translateY(-1px)!important; box-shadow: 0 5px 0 #58a700!important; }
+button.primary:active { transform: translateY(4px)!important; box-shadow: 0 0 0 #58a700!important; }
+button.secondary {
+    background-color: #ffffff!important; color: #64748b!important;
+    font-weight: 700!important; border-radius: 16px!important;
+    border: 2px solid #e2e8f0!important; box-shadow: 0 4px 0 #e2e8f0!important;
+}
+button.secondary:active { transform: translateY(4px)!important; box-shadow: none!important; }
+.preview-html {
+    border-radius: 24px!important; overflow: hidden!important;
+    background: white!important; box-shadow: 0 15px 35px rgba(0,0,0,0.08)!important;
+    border: 2px solid #f1f5f9!important; min-height: 500px;
+}
+.tabs > div > button { font-weight: 700!important; font-size: 1.05rem!important; }
+"""
+
+_empty = """
+<div style='display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:500px;color:#94a3b8;font-family:Nunito,sans-serif;'>
+    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+    <h3 style="margin:10px 0 0;font-size:1.5rem;font-weight:800;color:#475569;">引擎就绪</h3>
+    <p style="margin-top:12px;font-size:1rem;max-width:300px;text-align:center;line-height:1.6;">在左侧输入教学需求，AI将自动生成课件。</p>
+</div>
+"""
 
 def build_ui(cfg_path: str = "config.yaml") -> gr.Blocks:
     service = RAGService(cfg_path)
@@ -23,6 +72,7 @@ def build_ui(cfg_path: str = "config.yaml") -> gr.Blocks:
     try: idxs = service.list_indexes() or ["kb"]
     except: idxs = ["kb"]
 
+    # ── 工具函数 ──
     def asr_to_text(audio_path) -> str:
         if not audio_path: return ""
         try:
@@ -33,7 +83,7 @@ def build_ui(cfg_path: str = "config.yaml") -> gr.Blocks:
             return f"[语音识别需安装faster-whisper: {e}]"
 
     def pptx_preview(path):
-        if not path or not Path(path).exists(): return "<p style='color:#999;text-align:center;padding:40px;'>无PPT</p>"
+        if not path or not Path(path).exists(): return _empty
         try:
             from .ppt_preview import pptx_preview_html
             return pptx_preview_html(path, max_pages=12)
@@ -79,14 +129,11 @@ def build_ui(cfg_path: str = "config.yaml") -> gr.Blocks:
         return [], "", "已重置", None
 
     # ── 一键生成 ──
-    _empty = "<p style='color:#999;text-align:center;padding:40px;'>等待生成</p>"
-
     def gen_all(_st):
         if not pipeline:
             return "❌ 流水线未加载", _empty, "未生成", _empty, _empty, None, None, None, None, None
-        # 空对话保护
         if dialogue_mgr and not dialogue_mgr.collected.topic and not dialogue_mgr.history:
-            return "⚠️ 请先在左侧对话中描述您的教学需求（至少说明课题和知识点），然后再点此按钮。", _empty, "", _empty, _empty, None, None, None, None, None
+            return "⚠️ 请先在左侧对话中描述教学需求，然后再点此按钮。", _empty, "", _empty, _empty, None, None, None, None, None
         try:
             r = pipeline.generate_all(dialogue_mgr=dialogue_mgr, rag_service=service, output_types=["ppt","docx","game"])
             st = r.summary()
@@ -115,7 +162,7 @@ def build_ui(cfg_path: str = "config.yaml") -> gr.Blocks:
         try:
             r = pipeline.regenerate_with_feedback(feedback=fb, previous_result=prev, rag_service=service, regenerate_types=rt)
             st = "🔄 修改完成:\n"+r.summary()
-            return st, pptx_preview(r.pptx_path) if r.pptx_path else "", docx_preview(r.docx_path) if r.docx_path else "", r.game_html or "", r.animation_html or prev.animation_html or "", r.pptx_path, r.docx_path, r.game_path, getattr(r,'animation_path',None) or getattr(prev,'animation_path',None), r
+            return st, pptx_preview(r.pptx_path) if r.pptx_path else "", docx_preview(r.docx_path) if r.docx_path else "", r.game_html or "", r.animation_html or getattr(prev,'animation_html','') or "", r.pptx_path, r.docx_path, r.game_path, getattr(r,'animation_path',None) or getattr(prev,'animation_path',None), r
         except Exception as e:
             return f"❌ {e}", "", "", "", "", None, None, None, None, prev
 
@@ -127,110 +174,134 @@ def build_ui(cfg_path: str = "config.yaml") -> gr.Blocks:
             return hv.get("answer_md",""), hv.get("evidence_md",""), hv.get("sources_md",""), hv.get("trace_md","") if tr else "", json.dumps({"answer":res.get("answer")},ensure_ascii=False,indent=2)
         except Exception as e: return "","","",f"错误:{e}",""
 
-    # ═══════════ BUILD ═══════════
-    with gr.Blocks(title="多模态AI互动式教学智能体", theme=gr.themes.Soft(primary_hue="blue")) as demo:
+    # ═══════════════════════════════════════════
+    # BUILD UI（工业级视觉 + 完整后端连接）
+    # ═══════════════════════════════════════════
+    theme = gr.themes.Soft(
+        primary_hue="indigo", secondary_hue="blue", neutral_hue="slate",
+        font=[gr.themes.GoogleFont("Nunito"), "Arial", "sans-serif"]
+    )
+
+    with gr.Blocks(theme=theme, css=CUSTOM_CSS, title="多模态AI互动式教学智能体") as demo:
         cw = gr.State(None)
-        gr.Markdown("# 🎓 多模态 AI 互动式教学智能体\n**A04 锐捷网络** · 对话→一键生成PPT+Word+游戏+动画→预览下载→修改再生成")
 
-        # ──── Tab1: 对话+生成+预览 ────
-        with gr.Tab("💬 教学对话 & 课件生成"):
+        gr.Markdown(
+            """<div style="display:flex;align-items:center;gap:15px;padding:15px;">
+            <div style="background:linear-gradient(135deg,#6366f1,#8b5cf6);padding:12px;border-radius:16px;color:white;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+            </div>
+            <div>
+                <h1 style="margin:0;font-size:2rem;font-weight:800;color:#1e293b;">多模态 AI 互动式教学智能体</h1>
+                <p style="color:#64748b;font-size:1rem;margin:5px 0 0;font-weight:600;">A04 锐捷网络 · 对话→生成PPT+Word+游戏+动画→预览→修改→再生成</p>
+            </div></div>"""
+        )
+
+        # ══════ Tab 1: 教学对话 & 课件生成 ══════
+        with gr.Tab("✨ 智能共创中心"):
             with gr.Row():
-                with gr.Column(scale=1):
-                    gr.Markdown("### ① 描述教学需求")
-                    chatbot = gr.Chatbot(height=280)
+                with gr.Column(scale=4, elem_classes="glass-panel"):
+                    gr.Markdown("### 🎙️ 描述教学需求")
+                    chatbot = gr.Chatbot(height=300, show_label=False)
                     with gr.Row():
-                        mi = gr.Textbox(placeholder="我要做一节高二生物课，中心法则...", lines=2, scale=4, show_label=False)
-                        sb = gr.Button("发送", variant="primary", scale=1)
-                    au = gr.Audio(label="🎙️ 语音输入", sources=["microphone"], type="filepath")
+                        mi = gr.Textbox(show_label=False, placeholder="描述需求，如：帮我生成关于DNA转录的互动课...", scale=5)
+                        sb = gr.Button("发送 ✈️", elem_classes="secondary", scale=1)
+                    au = gr.Audio(sources=["microphone"], type="filepath", label="🎙️ 语音输入")
                     with gr.Accordion("📎 上传参考资料", open=False):
-                        gr.Markdown("*每次上传时请在下方说明此资料的用途，如「参照此PDF第3章格式」「从此视频提取知识点」*")
-                        rf = gr.File(label="PDF/Word/PPT/图片/视频", file_count="multiple")
-                        rn = gr.Textbox(label="此次上传的资料用途说明", placeholder="如: 参照此PDF第3章的知识点内容和排版格式")
-                    si = gr.Textbox(label="已收集信息", lines=5, interactive=False)
+                        gr.Markdown("<span style='color:#64748b;font-size:0.9em;'>上传PDF/Word/PPT/音视频，AI从中提取知识。每次上传请说明用途。</span>")
+                        rf = gr.File(label="拖拽文件至此", file_count="multiple")
+                        rn = gr.Textbox(label="资料用途说明", placeholder="如：参照此PDF第3章的格式和知识点")
+                    si = gr.Textbox(label="💡 已收集信息", interactive=False, lines=3)
                     with gr.Row():
-                        rb = gr.Button("🔄 重置")
-                        gb = gr.Button("🚀 一键生成全部课件", variant="primary", size="lg")
-                    gs = gr.Textbox(label="生成状态", lines=4, interactive=False)
+                        rb = gr.Button("🔄 重置对话", elem_classes="secondary")
+                        gb = gr.Button("🚀 一键生成全部课件", variant="primary", elem_classes="primary")
+                    gs = gr.Textbox(label="⏳ 生成状态", interactive=False, lines=3)
 
-                with gr.Column(scale=1):
-                    gr.Markdown("### ② 预览 & 下载")
-                    with gr.Tab("📊 PPT"):
-                        pp = gr.HTML(value=_empty)
-                        pd = gr.File(label="📥 下载PPT")
-                    with gr.Tab("📝 教案"):
-                        dp = gr.Textbox(label="教案预览", lines=10, interactive=False, value="等待生成")
-                        dd = gr.File(label="📥 下载Word")
-                    with gr.Tab("🎮 游戏"):
-                        gp = gr.HTML(value=_empty)
-                        gd = gr.File(label="📥 下载游戏HTML")
-                    with gr.Tab("🎬 动画"):
-                        ap = gr.HTML(value=_empty)
-                        ad = gr.File(label="📥 下载动画HTML")
+                with gr.Column(scale=7):
+                    with gr.Tabs():
+                        with gr.Tab("🎮 互动游戏"):
+                            gp = gr.HTML(value=_empty, elem_classes="preview-html")
+                            gd = gr.File(label="⏬ 下载游戏 (.html)")
+                        with gr.Tab("🎬 知识动画"):
+                            ap = gr.HTML(value=_empty, elem_classes="preview-html")
+                            ad = gr.File(label="⏬ 下载动画 (.html)")
+                        with gr.Tab("📊 PPT课件"):
+                            pp = gr.HTML(value=_empty, elem_classes="preview-html")
+                            pd = gr.File(label="⏬ 下载PPT (.pptx)")
+                        with gr.Tab("📝 Word教案"):
+                            dp = gr.Textbox(label="教案预览", lines=18, interactive=False, value="等待生成")
+                            dd = gr.File(label="⏬ 下载教案 (.docx)")
 
             sb.click(fn=chat, inputs=[mi,au,chatbot,rf,rn], outputs=[chatbot,mi,si,au])
             mi.submit(fn=chat, inputs=[mi,au,chatbot,rf,rn], outputs=[chatbot,mi,si,au])
             rb.click(fn=reset, outputs=[chatbot,mi,si,au])
             gb.click(fn=gen_all, inputs=[cw], outputs=[gs,pp,dp,gp,ap,pd,dd,gd,ad,cw])
 
-        # ──── Tab2: 迭代修改 ────
-        with gr.Tab("✏️ 迭代修改"):
-            gr.Markdown("### ③ 修改意见 → 再生成\n输入如「把第3页简化」「游戏改排序题」「教案增加讨论环节」")
+        # ══════ Tab 2: 迭代修改 ══════
+        with gr.Tab("✏️ 迭代微调"):
             with gr.Row():
-                with gr.Column(scale=1):
-                    fi = gr.Textbox(label="修改意见", lines=5, placeholder="如: 简化第3页 / 增加案例 / 游戏改排序题")
+                with gr.Column(scale=4, elem_classes="glass-panel"):
+                    gr.Markdown("### 🎯 输入修改意见")
+                    fi = gr.Textbox(label="修改要求", placeholder="如：把第3页简化 / 游戏改排序题 / 教案增加讨论环节", lines=5)
                     with gr.Row():
                         fp = gr.Checkbox(value=True, label="PPT")
                         fd = gr.Checkbox(value=True, label="Word")
                         fg = gr.Checkbox(value=True, label="游戏")
-                    fb = gr.Button("🔄 应用修改", variant="primary", size="lg")
-                    fs = gr.Textbox(label="状态", lines=4, interactive=False)
-                with gr.Column(scale=1):
-                    with gr.Tab("📊 PPT"):
-                        rpp = gr.HTML()
-                        rpd = gr.File(label="📥 PPT")
-                    with gr.Tab("📝 教案"):
-                        rdp = gr.Textbox(lines=8, interactive=False)
-                        rdd = gr.File(label="📥 Word")
-                    with gr.Tab("🎮 游戏"):
-                        rgp = gr.HTML()
-                        rgd = gr.File(label="📥 游戏")
-                    with gr.Tab("🎬 动画"):
-                        rap = gr.HTML()
-                        rad = gr.File(label="📥 动画")
-            fb.click(fn=regen, inputs=[fi,fp,fd,fg,cw], outputs=[fs,rpp,rdp,rgp,rap,rpd,rdd,rgd,rad,cw])
+                    fb_btn = gr.Button("✨ 应用修改并重新生成", variant="primary", elem_classes="primary")
+                    fs = gr.Textbox(label="状态", lines=3, interactive=False)
+                with gr.Column(scale=7):
+                    with gr.Tabs():
+                        with gr.Tab("🎮 游戏"):
+                            rgp = gr.HTML(value=_empty, elem_classes="preview-html")
+                            rgd = gr.File(label="下载游戏")
+                        with gr.Tab("🎬 动画"):
+                            rap = gr.HTML(value=_empty, elem_classes="preview-html")
+                            rad = gr.File(label="下载动画")
+                        with gr.Tab("📊 PPT"):
+                            rpp = gr.HTML(value=_empty, elem_classes="preview-html")
+                            rpd = gr.File(label="下载PPT")
+                        with gr.Tab("📝 教案"):
+                            rdp = gr.Textbox(lines=15, interactive=False)
+                            rdd = gr.File(label="下载教案")
 
-        # ──── Tab3: 知识问答 ────
-        with gr.Tab("🔍 知识问答"):
-            q = gr.Textbox(label="问题", placeholder="解释中心法则", lines=2)
-            with gr.Row():
-                qi = gr.Dropdown(choices=idxs, value=["kb"] if "kb" in idxs else idxs[:1], multiselect=True, label="索引")
-                qk = gr.Slider(1,20,value=5,step=1,label="K")
-                qt = gr.Checkbox(value=False, label="trace")
-            qb = gr.Button("查询", variant="primary")
-            qa = gr.Markdown()
-            with gr.Accordion("证据",open=True):
-                qe = gr.Markdown(); qs = gr.Markdown()
-            with gr.Accordion("Trace",open=False): qtr = gr.Markdown()
-            with gr.Accordion("JSON",open=False): qj = gr.Code(language="json")
-            qb.click(fn=query, inputs=[q,qi,qk,qt], outputs=[qa,qe,qs,qtr,qj])
+            fb_btn.click(fn=regen, inputs=[fi,fp,fd,fg,cw], outputs=[fs,rpp,rdp,rgp,rap,rpd,rdd,rgd,rad,cw])
 
-        # ──── Tab4: 知识库管理 ────
-        with gr.Tab("📚 知识库"):
-            ks = gr.Textbox(label="索引", interactive=False)
-            gr.Button("刷新").click(fn=lambda: "\n".join(f"  - {x}" for x in service.list_indexes()), outputs=[ks])
-            with gr.Row():
-                id_ = gr.Textbox(label="目录", value="knowledge_base")
-                ii = gr.Textbox(label="索引", value="kb")
-                iis = gr.Textbox(label="Session", value="kb")
-                ir = gr.Checkbox(value=True, label="重建")
-            ib = gr.Button("入库", variant="primary")
-            io = gr.Textbox(label="结果", lines=3, interactive=False)
-            def do_ingest(d,i,s,r):
-                try:
-                    if r: service.engine.reset_index(i)
-                    return f"✅ {service.engine.ingest_dir(d,index=i,source_type='knowledge_base',session_id=s or 'kb')}"
-                except Exception as e: return f"❌ {e}"
-            ib.click(fn=do_ingest, inputs=[id_,ii,iis,ir], outputs=[io])
+        # ══════ Tab 3: 知识问答 ══════
+        with gr.Tab("🔍 知识库问答"):
+            with gr.Column(elem_classes="glass-panel"):
+                q = gr.Textbox(label="提问", placeholder="向知识库提问...", lines=2)
+                with gr.Row():
+                    qi = gr.Dropdown(choices=idxs, value=["kb"] if "kb" in idxs else idxs[:1], multiselect=True, label="索引")
+                    qk = gr.Slider(1,20,value=5,step=1,label="Top-K")
+                    qt = gr.Checkbox(value=False, label="显示Trace")
+                qb = gr.Button("查询", variant="primary")
+                qa = gr.Markdown()
+                with gr.Accordion("📄 证据来源", open=False):
+                    qe = gr.Markdown(); qs_md = gr.Markdown()
+                with gr.Accordion("⚙️ Trace日志", open=False):
+                    qtr = gr.Markdown()
+                with gr.Accordion("JSON", open=False):
+                    qj = gr.Code(language="json")
+            qb.click(fn=query, inputs=[q,qi,qk,qt], outputs=[qa,qe,qs_md,qtr,qj])
+
+        # ══════ Tab 4: 知识库管理 ══════
+        with gr.Tab("📚 知识库管理"):
+            with gr.Column(elem_classes="glass-panel"):
+                ks = gr.Textbox(label="索引列表", interactive=False)
+                gr.Button("🔄 刷新").click(fn=lambda: "\n".join(f"  - {x}" for x in service.list_indexes()), outputs=[ks])
+                gr.Markdown("---")
+                with gr.Row():
+                    id_ = gr.Textbox(label="资料目录", value="knowledge_base")
+                    ii = gr.Textbox(label="索引名", value="kb")
+                    iis = gr.Textbox(label="Session", value="kb")
+                    ir = gr.Checkbox(value=True, label="重建索引")
+                ib = gr.Button("📥 开始入库", variant="primary", elem_classes="primary")
+                io = gr.Textbox(label="结果", lines=3, interactive=False)
+                def do_ingest(d,i,s,r):
+                    try:
+                        if r: service.engine.reset_index(i)
+                        return f"✅ {service.engine.ingest_dir(d,index=i,source_type='knowledge_base',session_id=s or 'kb')}"
+                    except Exception as e: return f"❌ {e}"
+                ib.click(fn=do_ingest, inputs=[id_,ii,iis,ir], outputs=[io])
 
     return demo
 
