@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("slidesgpt_generator")
 
 # 百度千帆配置
-BAIDU_QIANFAN_API_KEY = os.getenv("BAIDU_QIANFAN_API_KEY", "bce-v3/ALTAK-KUl4VMpILphl49LTlAM3I/aeed82ca9256762829780b33a3f39ed7e2e3529d")
+BAIDU_QIANFAN_API_KEY = os.getenv("BAIDU_QIANFAN_API_KEY", " ")
 BAIDU_PPT_API_URL = os.getenv("BAIDU_PPT_API_URL", "https://qianfan.baidubce.com/v2/tools/ai_ppt/generate_ppt_by_outline")
 
 def generate_ppt(
