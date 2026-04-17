@@ -96,7 +96,7 @@ generator:
   api_model: qwen3.5-plus
   intent_model: qwen3.5-plus
   outline_model: qwen3.5-flash
-  dialogue_model: qwen3.5-flash
+  dialogue_model: qwen3.5-plus
   game_model: qwen3.5-flash
   animation_model: qwen3.5-flash
   refine_model: qwen3.5-plus
@@ -104,12 +104,12 @@ generator:
   api_key_env: OPENAI_API_KEY
   timeout_sec: 45
   outline_timeout_sec: 75
-  dialogue_timeout_sec: 25
+  dialogue_timeout_sec: 35
   game_timeout_sec: 40
   animation_timeout_sec: 35
 
   max_new_tokens: 512
-  dialogue_max_new_tokens: 180
+  dialogue_max_new_tokens: 240
   temperature: 0.2
 
   # local 备用

@@ -38,15 +38,25 @@ function firstMatch(text: string, patterns: RegExp[]): string {
   return '';
 }
 
+function cleanTopicCandidate(value: string): string {
+  return cleanText(
+    value
+      .replace(/^(?:关于|有关|围绕)/, '')
+      .replace(/(?:的详细内容|的具体内容|的全部内容|的内容|相关内容|相关知识|知识点|课程|课件|教案)$/i, '')
+      .replace(/^(?:口述|说出|描述|解释|分析|比较|归纳|总结)/, ''),
+  ).slice(0, 32);
+}
+
 function inferTopic(latestUserMessage: string, corpus: string): string {
-  const explicit = firstMatch(corpus, [
+  const explicit = cleanTopicCandidate(firstMatch(corpus, [
     /(?:课题|主题|内容|知识点)[：:\s]*([^。；\n]{2,32})/i,
     /(?:讲|学习|复习|介绍|展示)([^。；\n]{2,32})/i,
     /关于([^。；\n]{2,32})/i,
-  ]);
+    /(?:学会|理解|掌握|能够|能|说出|口述|描述|解释|分析|比较|归纳|总结|完成)([^。；\n]{2,32})/i,
+  ]));
   if (explicit) return explicit;
 
-  const candidate = cleanText(
+  const candidate = cleanTopicCandidate(
     latestUserMessage
       .replace(/^(我想|想|帮我|请|麻烦|希望|需要)/, '')
       .replace(/(做|生成|设计|准备).*/, '')
@@ -66,6 +76,7 @@ function inferTeachingGoal(corpus: string): string {
   return firstMatch(corpus, [
     /(?:教学目标|目标)[：:\s]*([^。；\n]{6,80})/i,
     /(?:想让学生|希望学生|让学生)([^。；\n]{6,80})/i,
+    /((?:学会|理解|掌握|能够|能|说出|口述|描述|解释|分析|比较|归纳|总结|完成)[^。；\n]{4,80})/i,
   ]);
 }
 

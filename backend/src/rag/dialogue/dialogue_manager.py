@@ -279,6 +279,14 @@ class DialogueManager:
                 reply=self._generate_final_summary(),
             )
 
+        if self.state == DialogueState.COLLECTING and self._is_greeting_or_smalltalk(user_input):
+            return PreparedDialogueTurn(
+                mode="cloud",
+                state=self.state,
+                task="dialogue",
+                messages=self._build_cloud_messages(user_input, task="dialogue"),
+            )
+
         completed_this_turn = self.collected.is_complete() and self.state == DialogueState.COLLECTING
         if completed_this_turn:
             self.state = DialogueState.CONFIRMING
@@ -611,11 +619,12 @@ class DialogueManager:
             r"(?:主题|章节|知识点)(?:是|为|：|:)?\s*([^，。；;\n]{2,40})",
             r"(?:关于|讲解|讲|学习|复习|准备|制作|设计)([^，。；;\n]{2,40})(?:的?(?:课件|课程|课堂|教案|ppt|PPT)|[，。；;]|$)",
             r"(?:我想|想要|需要|希望)(?:做|准备|上)?(?:一节)?([^，。；;\n]{2,40})(?:课|课程|课堂|课件|教案)",
+            r"(?:学会|理解|掌握|能够|能|说出|口述|描述|解释|分析|比较|归纳|总结|完成)([^，。；;\n]{2,40})",
         ]
         for pat in patterns:
             match = re.search(pat, text)
             if match:
-                topic = match.group(1).strip(" ，。；;：:")
+                topic = DialogueManager._clean_topic_candidate(match.group(1))
                 if topic:
                     return topic
         return ""
@@ -626,6 +635,7 @@ class DialogueManager:
             r"(?:教学目标|目标)(?:是|为|：|:)?\s*([^。；;\n]{4,120})",
             r"(?:希望学生|让学生|使学生)\s*([^。；;\n]{4,120})",
             r"(?:达到|实现)([^。；;\n]{4,120})",
+            r"((?:学会|理解|掌握|能够|能|说出|口述|描述|解释|分析|比较|归纳|总结|完成)[^。；;\n]{4,120})",
         ]
         for pat in patterns:
             match = re.search(pat, text)
@@ -634,6 +644,15 @@ class DialogueManager:
                 if goal:
                     return goal
         return ""
+
+    @staticmethod
+    def _clean_topic_candidate(value: str) -> str:
+        topic = value.strip(" ，。；;：:")
+        topic = re.sub(r"^(?:关于|有关|围绕)", "", topic)
+        topic = re.sub(r"(?:的详细内容|的具体内容|的全部内容|的内容|相关内容|相关知识|知识点|课程|课件|教案)$", "", topic)
+        topic = re.sub(r"^(?:口述|说出|描述|解释|分析|比较|归纳|总结)", "", topic)
+        topic = topic.strip(" ，。；;：:")
+        return topic[:40]
 
     @staticmethod
     def _extract_list_after_keywords(text: str, keywords: Tuple[str, ...]) -> List[str]:
@@ -791,20 +810,56 @@ class DialogueManager:
         previous_missing: List[str],
         current_missing: List[str],
     ) -> bool:
-        """Use local slot-filling only when the message looks like a direct answer."""
+        """Use local slot-filling only for explicit slot values, not natural language requests."""
+        if self._is_greeting_or_smalltalk(user_input):
+            return False
+
         if self._looks_complex_or_ambiguous(user_input):
             return False
 
         filled_any_slot = len(current_missing) < len(previous_missing)
-        short_direct_reply = len(user_input.strip()) <= 24
+        short_direct_reply = len(user_input.strip()) <= 16
+        goal_like_reply = bool(
+            re.search(r"(学会|理解|掌握|能够|能|说出|口述|描述|解释|分析|比较|归纳|总结|完成)", user_input)
+        )
 
-        # Duration / grade / terse topic answers are cheap to handle locally.
         if re.search(r"(\d+)\s*分钟", user_input):
             return True
         if re.search(r"(高[一二三]|初[一二三]|[一二三四五六]年级)", user_input):
             return True
+        if re.fullmatch(r"\s*(?:ppt|PPT|教案|docx|word|互动|游戏|动画)(?:\s*[/、,，+]\s*(?:ppt|PPT|教案|docx|word|互动|游戏|动画))*\s*", user_input):
+            return True
+        if goal_like_reply and not filled_any_slot:
+            return False
+        if self._looks_like_natural_language_request(user_input):
+            return False
 
-        return filled_any_slot or short_direct_reply
+        return filled_any_slot and short_direct_reply
+
+    @staticmethod
+    def _is_greeting_or_smalltalk(text: str) -> bool:
+        normalized = text.strip().lower()
+        if not normalized:
+            return False
+
+        greeting_phrases = (
+            "你好",
+            "您好",
+            "hi",
+            "hello",
+            "嗨",
+            "在吗",
+            "在不在",
+            "有人吗",
+            "帮我",
+            "帮我备课",
+            "帮我做课件",
+            "想备课",
+            "想做课件",
+            "开始吧",
+            "开始",
+        )
+        return any(phrase in normalized for phrase in greeting_phrases)
 
     @staticmethod
     def _looks_complex_or_ambiguous(text: str) -> bool:
@@ -826,6 +881,22 @@ class DialogueManager:
 
         punctuation_count = sum(normalized.count(ch) for ch in ("，", "；", "。", ",", ";"))
         return punctuation_count >= 2
+
+    @staticmethod
+    def _looks_like_natural_language_request(text: str) -> bool:
+        normalized = text.strip()
+        if not normalized:
+            return False
+
+        natural_markers = (
+            "我", "想", "希望", "需要", "关于", "内容", "过程", "原因", "特点", "意义", "详细",
+            "如何", "为什么", "怎么", "请", "帮", "最好", "适合", "结合", "不要", "而是",
+            "学会", "理解", "掌握", "能够", "说出", "口述", "描述", "解释", "分析", "比较", "归纳", "总结", "完成",
+        )
+        if any(marker in normalized for marker in natural_markers):
+            return True
+
+        return len(normalized) > 8
 
     def _format_history(self, max_turns: int = 20) -> str:
         recent = self.history[-max_turns * 2:]
